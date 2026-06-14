@@ -25,11 +25,14 @@ import { cdsLookup, getSocketStatus } from '../../textsecure/WebAPI.preload.ts';
 import type { FeatureFlagType } from '../../window.d.ts';
 import type { StorageAccessType } from '../../types/Storage.d.ts';
 import { calling } from '../../services/calling.preload.ts';
+import { notificationService } from '../../services/notifications.preload.ts';
+import { callingTones } from '../../util/callingTones.preload.ts';
 import { Environment, getEnvironment } from '../../environment.std.ts';
 import { isProduction } from '../../util/version.std.ts';
 import { benchmarkConversationOpen } from '../../CI/benchmarkConversationOpen.preload.ts';
 import { itemStorage } from '../../textsecure/Storage.preload.ts';
 import { getSelectedConversationId } from '../../state/selectors/nav.std.ts';
+import { NotificationType } from '../../types/notifications.std.ts';
 
 const log = createLogger('start');
 
@@ -56,6 +59,14 @@ if (
   !isProduction(window.SignalContext.getVersion()) ||
   window.SignalContext.config.devTools
 ) {
+  const getDebugConversationId = (
+    conversationId?: string
+  ): string | undefined => {
+    return (
+      conversationId ?? getSelectedConversationId(window.reduxStore.getState())
+    );
+  };
+
   const SignalDebug = {
     cdsLookup: (options: CdsLookupOptionsType) => cdsLookup(options),
     getSelectedConversation: () => {
@@ -90,6 +101,54 @@ if (
     getIceServerOverride: () => calling._iceServerOverride,
     getSocketStatus: () => getSocketStatus(),
     getStorageItem: (name: keyof StorageAccessType) => itemStorage.get(name),
+    debugNotification: ({
+      body = 'Debug message',
+      conversationId,
+      delayMs = 5000,
+    }: {
+      body?: string;
+      conversationId?: string;
+      delayMs?: number;
+    } = {}) => {
+      const id = getDebugConversationId(conversationId);
+      if (!id) {
+        log.warn('debugNotification: no selected conversation');
+        return undefined;
+      }
+
+      window.setTimeout(() => {
+        const conversation = window.ConversationController.get(id);
+        if (!conversation) {
+          log.warn('debugNotification: conversation not found', id);
+          return;
+        }
+
+        notificationService.add({
+          conversationId: id,
+          isExpiringMessage: false,
+          messageId: `debug-${Date.now()}`,
+          message: body,
+          senderTitle: conversation.getTitle(),
+          sentAt: Date.now(),
+          type: NotificationType.Message,
+        });
+      }, delayMs);
+
+      return {
+        conversationId: id,
+        delayMs,
+      };
+    },
+    debugRingtone: (delayMs = 5000) => {
+      window.setTimeout(() => {
+        void callingTones.playRingtone();
+      }, delayMs);
+
+      return { delayMs };
+    },
+    debugStopRingtone: () => {
+      void callingTones.stopRingtone();
+    },
     putStorageItem: <K extends keyof StorageAccessType>(
       name: K,
       value: StorageAccessType[K]
