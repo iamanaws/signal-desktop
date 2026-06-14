@@ -4,6 +4,7 @@
 import PQueue from 'p-queue';
 import { MINUTE } from './durations/index.std.ts';
 import { Sound, SoundType } from './Sound.std.ts';
+import { isDoNotDisturbEnabled } from './doNotDisturb.node.ts';
 import { itemStorage } from '../textsecure/Storage.preload.ts';
 
 const ringtoneEventQueue = new PQueue({
@@ -51,7 +52,7 @@ class CallingTones {
       }
 
       const canPlayTone = getCallRingtoneNotificationSetting();
-      if (!canPlayTone) {
+      if (!canPlayTone || (await isDoNotDisturbEnabled())) {
         return;
       }
 

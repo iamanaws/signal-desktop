@@ -18,6 +18,7 @@ import type { StorageInterface } from '../types/Storage.d.ts';
 import type { LocalizerType } from '../types/Util.std.ts';
 import { NotificationType } from '../types/notifications.std.ts';
 import { drop } from '../util/drop.std.ts';
+import { isDoNotDisturbEnabled } from '../util/doNotDisturb.node.ts';
 import type { Emoji } from '../axo/emoji.std.ts';
 
 const { debounce } = lodash;
@@ -333,7 +334,7 @@ class NotificationService extends EventEmitter {
     this.#update();
   }
 
-  #fastUpdate(): void {
+  async #fastUpdate(): Promise<void> {
     const storage = this.#getStorage();
     const i18n = this.#getI18n();
     const notificationData = this.#notificationData;
@@ -372,9 +373,9 @@ class NotificationService extends EventEmitter {
       return;
     }
 
-    const shouldPlayNotificationSound = Boolean(
-      storage.get('audio-notification')
-    );
+    const shouldPlayNotificationSound =
+      Boolean(storage.get('audio-notification')) &&
+      !(await isDoNotDisturbEnabled());
 
     const shouldDrawAttention = storage.get(
       'notification-draw-attention',
