@@ -3,18 +3,12 @@
 
 import { execFile as execFileCb } from 'node:child_process';
 import { promisify } from 'node:util';
-import os from 'node:os';
-import path from 'node:path';
-import fsExtra from 'fs-extra';
+import { isDoNotDisturbEnabled as getNativeDoNotDisturbEnabled } from '@signalapp/mute-state-change';
 
-import { createLogger } from '../logging/log.std.ts';
-import * as Errors from '../types/errors.std.ts';
 import { SECOND } from './durations/index.std.ts';
 
 const CACHE_TTL_MS = 5 * SECOND;
 const EXEC_TIMEOUT_MS = 2 * SECOND;
-
-const log = createLogger('doNotDisturb');
 
 const execFile = promisify(execFileCb);
 
@@ -26,10 +20,9 @@ type CommandRunner = (
   command: string,
   args: ReadonlyArray<string>
 ) => Promise<string | undefined>;
-type MacFocusAssertions = Readonly<{
-  data?: ReadonlyArray<{
-    storeAssertionRecords?: ReadonlyArray<unknown>;
-  }>;
+type MacDoNotDisturbDebugState = Readonly<{
+  platform: string;
+  nativeObservedState?: boolean;
 }>;
 type DesktopQuery = () => Promise<boolean | undefined>;
 
@@ -72,6 +65,13 @@ export async function isDoNotDisturbEnabled(): Promise<boolean> {
   return pendingQuery;
 }
 
+export function _getDoNotDisturbDebugStateForTests(): MacDoNotDisturbDebugState {
+  return {
+    platform: process.platform,
+    nativeObservedState: getNativeDoNotDisturbEnabled(),
+  };
+}
+
 /** @internal */
 export function _resetDoNotDisturbCacheForTests(): void {
   cachedResult = undefined;
@@ -92,7 +92,7 @@ async function queryDoNotDisturbEnabled(): Promise<boolean> {
   }
 
   if (process.platform === 'darwin') {
-    return isMacDoNotDisturbEnabled();
+    return getNativeDoNotDisturbEnabled() ?? false;
   }
 
   return false;
@@ -175,41 +175,6 @@ async function queryXfceDoNotDisturb(): Promise<boolean | undefined> {
       '/do-not-disturb',
     ])
   );
-}
-
-function isMacDoNotDisturbEnabled(): boolean {
-  const assertionsPath = path.join(
-    os.homedir(),
-    'Library',
-    'DoNotDisturb',
-    'DB',
-    'Assertions.json'
-  );
-
-  try {
-    if (!fsExtra.pathExistsSync(assertionsPath)) {
-      return false;
-    }
-
-    // Active Focus modes are recorded as assertion entries in this file.
-    const { data } = JSON.parse(
-      fsExtra.readFileSync(assertionsPath, 'utf8')
-    ) as MacFocusAssertions;
-
-    return Boolean(
-      data?.some(
-        entry =>
-          Array.isArray(entry.storeAssertionRecords) &&
-          entry.storeAssertionRecords.length > 0
-      )
-    );
-  } catch (error) {
-    log.warn(
-      'Failed to inspect macOS Focus assertions:',
-      Errors.toLogFormat(error)
-    );
-    return false;
-  }
 }
 
 async function runCommand(

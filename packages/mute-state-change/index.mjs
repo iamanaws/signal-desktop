@@ -4,11 +4,18 @@
 import bindings from 'bindings';
 
 let addon;
-const subscribers = new Set();
+const muteSubscribers = new Set();
+const dndSubscribers = new Set();
 
 function onIsMutedChange() {
   const newValue = isMuted();
-  for (const fn of subscribers) {
+  for (const fn of muteSubscribers) {
+    fn(newValue);
+  }
+}
+
+function onDoNotDisturbChange(newValue) {
+  for (const fn of dndSubscribers) {
     fn(newValue);
   }
 }
@@ -18,10 +25,14 @@ function getAddon() {
     try {
       addon = bindings('mute-state-change');
       addon.onIsMutedChange(onIsMutedChange);
+      addon.onDoNotDisturbChange(onDoNotDisturbChange);
     } catch {
       // Windows, Linux, older macOS
       addon = {
+        getIsDoNotDisturbEnabled: () => undefined,
         getIsMuted: () => undefined,
+        onDoNotDisturbChange: () => undefined,
+        onIsMutedChange: () => undefined,
         setIsMuted: () => undefined,
       };
     }
@@ -38,10 +49,22 @@ export function setIsMuted(newValue) {
   getAddon().setIsMuted(!!newValue);
 }
 
+export function isDoNotDisturbEnabled() {
+  return getAddon().getIsDoNotDisturbEnabled();
+}
+
 export function subscribe(callback) {
-  subscribers.add(callback);
+  muteSubscribers.add(callback);
 }
 
 export function unsubscribe(callback) {
-  subscribers.delete(callback);
+  muteSubscribers.delete(callback);
+}
+
+export function subscribeDoNotDisturb(callback) {
+  dndSubscribers.add(callback);
+}
+
+export function unsubscribeDoNotDisturb(callback) {
+  dndSubscribers.delete(callback);
 }

@@ -27,6 +27,11 @@ import type { StorageAccessType } from '../../types/Storage.d.ts';
 import { calling } from '../../services/calling.preload.ts';
 import { notificationService } from '../../services/notifications.preload.ts';
 import { callingTones } from '../../util/callingTones.preload.ts';
+import {
+  _getDoNotDisturbDebugStateForTests,
+  _resetDoNotDisturbCacheForTests,
+  isDoNotDisturbEnabled,
+} from '../../util/doNotDisturb.node.ts';
 import { Environment, getEnvironment } from '../../environment.std.ts';
 import { isProduction } from '../../util/version.std.ts';
 import { benchmarkConversationOpen } from '../../CI/benchmarkConversationOpen.preload.ts';
@@ -101,6 +106,23 @@ if (
     getIceServerOverride: () => calling._iceServerOverride,
     getSocketStatus: () => getSocketStatus(),
     getStorageItem: (name: keyof StorageAccessType) => itemStorage.get(name),
+    getNotificationDebugState: () => ({
+      isAppActive: window.SignalContext.activeWindowService.isActive(),
+      isNotificationServiceEnabled: notificationService.isEnabled,
+      notificationPermission: Notification.permission,
+      notificationSetting: notificationService.getNotificationSetting(),
+      socketStatus: getSocketStatus(),
+    }),
+    getDoNotDisturbDebugState: async (forceRefresh = false) => {
+      if (forceRefresh) {
+        _resetDoNotDisturbCacheForTests();
+      }
+
+      return {
+        ..._getDoNotDisturbDebugStateForTests(),
+        isDoNotDisturbEnabled: await isDoNotDisturbEnabled(),
+      };
+    },
     debugNotification: ({
       body = 'Debug message',
       conversationId,

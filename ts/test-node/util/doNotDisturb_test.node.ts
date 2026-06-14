@@ -1,9 +1,7 @@
 // Copyright 2026 Signal Messenger, LLC
 // SPDX-License-Identifier: AGPL-3.0-only
 
-import os from 'node:os';
 import { assert } from 'chai';
-import fsExtra from 'fs-extra';
 import sinon from 'sinon';
 
 import {
@@ -124,30 +122,6 @@ describe('doNotDisturb', () => {
 
     assert.isFalse(await isDoNotDisturbEnabled());
     assert.strictEqual(commandRunner.callCount, 1);
-  });
-
-  it('reads active Focus assertions on macOS', async () => {
-    sandbox.stub(process, 'platform').value('darwin');
-    sandbox.stub(os, 'homedir').returns('/Users/tester');
-    sandbox.stub(fsExtra, 'pathExistsSync').returns(true);
-    sandbox.stub(fsExtra, 'readFileSync').returns(
-      JSON.stringify({
-        data: [
-          {
-            storeAssertionRecords: [
-              {
-                assertionDetails: {
-                  assertionDetailsModeIdentifier:
-                    'com.apple.donotdisturb.mode.default',
-                },
-              },
-            ],
-          },
-        ],
-      })
-    );
-
-    assert.isTrue(await isDoNotDisturbEnabled());
   });
 
   it('caches results for five seconds', async () => {
